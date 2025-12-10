@@ -130,9 +130,10 @@ void atualizar_tedax(GameState *g) {
             g->tedax.modulo_atual = -1;
             
             // Se não há módulos pendentes e ainda não gerou o máximo, gerar um novo imediatamente
+            // NÃO resetar o contador de ticks, para que o timer continue contando normalmente
             if (!tem_modulos_pendentes(g) && g->qtd_modulos < g->max_modulos) {
                 gerar_novo_modulo(g);
-                g->ticks_desde_ultimo_modulo = 0; // Resetar contador de ticks
+                // O contador ticks_desde_ultimo_modulo continua, não reseta
             }
         }
     }

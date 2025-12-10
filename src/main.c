@@ -17,6 +17,17 @@ void processar_entrada(GameState *g, char *buffer_instrucao, int *buffer_len) {
         return; // Nenhuma tecla pressionada neste tick
     }
     
+    // Tecla 'q' para sair (sempre permitida)
+    if (ch == 'q' || ch == 'Q') {
+        g->tempo_restante = 0; // Forçar fim do jogo
+        return;
+    }
+    
+    // Se o tedax estiver ocupado, desabilitar todos os outros inputs
+    if (g->tedax.estado == TEDAX_OCUPADO) {
+        return; // Ignorar todos os inputs quando tedax está ocupado
+    }
+    
     // Processar tecla 'p' para adicionar aperto
     if (ch == 'p' || ch == 'P') {
         if (*buffer_len < 3) { // Máximo de 3 'p'
@@ -67,11 +78,7 @@ void processar_entrada(GameState *g, char *buffer_instrucao, int *buffer_len) {
             }
             // Se não há módulos pendentes, ignorar ENTER
         }
-        // Se tedax está ocupado, ignorar ENTER
-    }
-    // Tecla 'q' para sair (opcional, para debug)
-    else if (ch == 'q' || ch == 'Q') {
-        g->tempo_restante = 0; // Forçar fim do jogo
+        // Se não há módulos pendentes, ignorar ENTER
     }
 }
 

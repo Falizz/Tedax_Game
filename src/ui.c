@@ -100,16 +100,17 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
         }
         
         // Mostrar detalhes do módulo
-        mvprintw(linha, 0, "  Modulo %d: %s - %s", 
-                 mod->id, nome_cor(mod->cor), nome_estado_modulo(mod->estado));
-        
         if (mod->estado == MOD_EM_EXECUCAO) {
-            mvprintw(linha, 50, "Tempo: %d/%d", mod->tempo_restante, mod->tempo_total);
+            mvprintw(linha, 0, "  Modulo %d: %s - %s", 
+                     mod->id, nome_cor(mod->cor), nome_estado_modulo(mod->estado));
+        } else if (mod->estado == MOD_RESOLVIDO) {
+            mvprintw(linha, 0, "  Modulo %d: %s", 
+                     mod->id, nome_estado_modulo(mod->estado));
+        } else {
+            mvprintw(linha, 0, "  Modulo %d: %s - %s - Execucao: %d sec", 
+                     mod->id, nome_cor(mod->cor), nome_estado_modulo(mod->estado),
+                     mod->tempo_total);
         }
-        
-        // if (mod->estado == MOD_PENDENTE) {
-        //     mvprintw(linha, 50, "Instrucao correta: %s", mod->instrucao_correta);
-        // }
         
         linha++;
         
@@ -128,7 +129,22 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
     linha++;
     
     // Área de entrada
-    mvprintw(linha++, 0, "Instrucao: [%s]", buffer_instrucao);
+    if (g->tedax.estado == TEDAX_OCUPADO) {
+        // Input desabilitado quando tedax está ocupado
+        if (cores_disponiveis) {
+            attron(COLOR_PAIR(3)); // Amarelo/Vermelho para indicar desabilitado
+        } else {
+            attron(A_DIM); // Texto com menos brilho
+        }
+        mvprintw(linha++, 0, "Instrucao: [DESABILITADO - Tedax ocupado]");
+        if (cores_disponiveis) {
+            attroff(COLOR_PAIR(3));
+        } else {
+            attroff(A_DIM);
+        }
+    } else {
+        mvprintw(linha++, 0, "Instrucao: [%s]", buffer_instrucao);
+    }
     
     refresh();
 }
