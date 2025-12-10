@@ -1,5 +1,4 @@
-# Keep Solving and Nobody Explodes - Versão de Treino
-
+# Keep Solving and Nobody Explodes
 Versão básica sequencial do jogo de desarmamento de bombas, implementada em C com ncurses.
 
 ## Requisitos
@@ -11,12 +10,6 @@ Versão básica sequencial do jogo de desarmamento de bombas, implementada em C 
 
 ```bash
 sudo apt-get install libncurses5-dev libncursesw5-dev
-```
-
-### Instalação do ncurses (Fedora/CentOS)
-
-```bash
-sudo dnf install ncurses-devel
 ```
 
 ## Compilação
@@ -47,20 +40,16 @@ gcc -Wall -Wextra -std=c11 main.c game.c ui.c -o jogo -lncurses
    - **Difícil**: 12 módulos, 1 a cada 10 segundos
 2. Use as setas do teclado para navegar e ENTER para selecionar a dificuldade.
 3. O jogo começa com 1 módulo já gerado.
-4. Cada módulo tem uma cor (Vermelho, Verde ou Azul) e requer uma sequência específica:
-   - **Vermelho**: `p` (1 aperto)
-   - **Verde**: `pp` (2 apertos)
-   - **Azul**: `ppp` (3 apertos)
-5. Digite a sequência de `p` e pressione ENTER para designar o módulo ao tedax.
+4. Cada módulo tem uma cor e requer uma sequência específica, que no arquivo de instruções está expecificado ao jogador
+5. Digite a sequência de caracteres instruida pelo arquivo de instruções e pressione ENTER para designar o módulo ao tedax.
 6. O tedax ocupará a bancada pelo tempo necessário para desarmar o módulo.
-7. Se a instrução estiver correta, o módulo é desarmado. Se estiver incorreta, ele volta para o mural.
+7. Se a instrução estiver correta, o módulo é desarmado. Se estiver incorreta, ele volta para o mural como ultimo da fila.
 8. O jogo termina quando:
    - Todos os módulos necessários são desarmados (VITÓRIA)
-   - O tempo de 120 segundos acaba e ainda há módulos pendentes (DERROTA)
+   - O tempo acaba e ainda há módulos pendentes (DERROTA)
 
 ## Controles
 
-- `p`: Adiciona um aperto à instrução
 - `BACKSPACE`: Remove o último caractere da instrução
 - `ENTER`: Envia a instrução para o tedax (se ele estiver livre)
 - `q`: Sair do jogo (força fim imediato)
@@ -72,9 +61,7 @@ gcc -Wall -Wextra -std=c11 main.c game.c ui.c -o jogo -lncurses
 - `ui.h` / `ui.c`: Interface ncurses e exibição de informações (futura thread de Exibição)
 - `Makefile`: Arquivo de compilação
 
-## Notas para Implementação Concorrente
-
-O código está organizado com comentários `// FUTURO:` indicando onde cada função será transformada em uma thread:
+## Notas
 
 - **Mural de Módulos Pendentes**: `gerar_novo_modulo()` e `atualizar_mural()`
 - **Exibição de Informações**: `desenhar_tela()`
