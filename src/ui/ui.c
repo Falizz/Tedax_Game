@@ -5,6 +5,7 @@
 #include <ncurses.h>
 #include <string.h>
 #include <time.h>
+#include <stdio.h>
 
 // Inicializa o ncurses
 void inicializar_ncurses(void) {
@@ -23,6 +24,38 @@ void finalizar_ncurses(void) {
     echo();
     curs_set(1);
     endwin();
+}
+
+// Gera uma barra de progresso visual
+// Retorna uma string formatada com a barra e porcentagem
+// Exemplo: "██████------ 50%"
+void gerar_barra_progresso(char *buffer, int tamanho_buffer, int tempo_total, int tempo_restante) {
+    if (tempo_total <= 0) {
+        snprintf(buffer, tamanho_buffer, "████████████ 100%%");
+        return;
+    }
+    
+    // Calcular porcentagem (0-100)
+    int progresso = ((tempo_total - tempo_restante) * 100) / tempo_total;
+    if (progresso < 0) progresso = 0;
+    if (progresso > 100) progresso = 100;
+    
+    // Tamanho da barra (10 caracteres)
+    const int tamanho_barra = 10;
+    int blocos_preenchidos = (progresso * tamanho_barra) / 100;
+    
+    // Construir a barra usando caracteres ASCII
+    int pos = 0;
+    for (int i = 0; i < blocos_preenchidos && pos < tamanho_buffer - 8; i++) {
+        buffer[pos++] = '#';
+    }
+    for (int i = blocos_preenchidos; i < tamanho_barra && pos < tamanho_buffer - 8; i++) {
+        buffer[pos++] = '-';
+    }
+    buffer[pos] = '\0';
+    
+    // Adicionar porcentagem
+    snprintf(buffer + pos, tamanho_buffer - pos, " %d%%", progresso);
 }
 
 // Desenha toda a interface do jogo na tela
@@ -88,8 +121,10 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
             }
             if (t->modulo_atual >= 0) {
                 const Modulo *mod = &g->modulos[t->modulo_atual];
-                mvprintw(linha++, 0, "  Tedax %d: OCUPADO - Desarmando M%d - Tempo restante: %d segundos",
-                         t->id, mod->id, mod->tempo_restante);
+                char barra[32];
+                gerar_barra_progresso(barra, sizeof(barra), mod->tempo_total, mod->tempo_restante);
+                mvprintw(linha++, 0, "  Tedax %d: OCUPADO - Desarmando M%d - %s",
+                         t->id, mod->id, barra);
                 // Mostrar módulo em espera na linha de baixo
                 if (t->qtd_fila > 0 && t->fila_modulos[0] >= 0 && t->fila_modulos[0] < g->qtd_modulos) {
                     const Modulo *mod_fila = &g->modulos[t->fila_modulos[0]];
