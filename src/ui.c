@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "ui.h"
+#include "audio.h"
 #include <ncurses.h>
 #include <string.h>
 #include <time.h>
@@ -287,12 +288,19 @@ void mostrar_mensagem_derrota(void) {
     mostrar_menu_pos_jogo(0);
 }
 
+// Variável global para estado da música (mantém estado entre chamadas)
+static int musica_ligada_global = 0;
+
+// Declaração externa da flag de áudio (definida em main.c)
+extern int audio_disponivel_global;
+extern int audio_disponivel_global; // Declarada em main.c
+
 // Mostra menu principal e retorna o modo escolhido
 // Retorna: 0 = Classico, 1-6 = Outros modos (em breve), -1 = Sair
 int mostrar_menu_principal(void) {
     clear();
     int cores_disponiveis = has_colors();
-    int selecao = 0; // 0 = Classico, 1-6 = Outros, 7 = Configs, 8 = Sair
+    int selecao = 0; // 0 = Classico, 1-5 = Outros, 6 = Configs, 7 = Musica, 8 = Sair
     
     // Configurar para não bloquear na leitura
     nodelay(stdscr, FALSE);
@@ -305,13 +313,14 @@ int mostrar_menu_principal(void) {
         attron(A_BOLD);
         mvprintw(LINES / 2 - 10, COLS / 2 - 20, "========================================");
         mvprintw(LINES / 2 - 9, COLS / 2 - 20, "  KEEP SOLVING AND NOBODY EXPLODES");
-        mvprintw(LINES / 2 - 8, COLS / 2 - 20, "         VERSAO DE TREINO");
         mvprintw(LINES / 2 - 7, COLS / 2 - 20, "========================================");
         attroff(A_BOLD);
         
         mvprintw(LINES / 2 - 5, COLS / 2 - 15, "Selecione o Modo de Jogo:");
         
-        // Opções do menu
+        // Opções do menu (texto dinâmico para música)
+        const char* texto_musica = musica_ligada_global ? "M. Desligar Musica" : "M. Ligar Musica";
+        
         const char* opcoes[9] = {
             "1. Classico",
             "2. Especialistas [Em Breve]",
@@ -319,20 +328,21 @@ int mostrar_menu_principal(void) {
             "4. Extras [Em Breve]",
             "5. Treino [Em Breve]",
             "6. Custom [Em Breve]",
-            "7. Manual [Em Breve]",
             "C. Configs [Em Breve]",
+            texto_musica,
             "Q. Sair"
         };
         
         // Desenhar opções
         for (int i = 0; i < 9; i++) {
             int y;
-            if (i < 7) {
-                // Opções 1-7: posições normais
+            if (i < 6) {
+                // Opções 1-6: posições normais
                 y = LINES / 2 - 3 + i;
             } else {
-                // Opções C e Q: adicionar espaço em branco antes (linha extra)
-                // i=7 (C. Configs) vai para posição que seria i=8
+                // Opções C, M e Q: adicionar espaço em branco antes (linha extra)
+                // i=6 (C. Configs) vai para posição que seria i=7
+                // i=7 (M. Ligar/Desligar Musica) vai para posição que seria i=8
                 // i=8 (Q. Sair) vai para posição que seria i=9
                 y = LINES / 2 - 3 + i + 1;
             }
@@ -362,18 +372,54 @@ int mostrar_menu_principal(void) {
         // Ler entrada (bloqueia até receber)
         int ch = getch();
         if (ch == KEY_UP || ch == 'w' || ch == 'W') {
-            selecao = (selecao - 1 + 9) % 9;
+            selecao = (selecao - 1 + 10) % 10;
         } else if (ch == KEY_DOWN || ch == 's' || ch == 'S') {
-            selecao = (selecao + 1) % 9;
+            selecao = (selecao + 1) % 10;
         } else if (ch == '\n' || ch == '\r' || ch == KEY_ENTER) {
             if (selecao == 0) {
                 // Classico - retorna 0
                 return 0;
-            } else if (selecao >= 1 && selecao <= 6) {
+            } else if (selecao >= 1 && selecao <= 5) {
                 // Modos em breve - não faz nada, apenas mostra que está em breve
                 // Pode adicionar uma mensagem aqui se quiser
-            } else if (selecao == 7) {
+            } else if (selecao == 6) {
                 // Configs em breve - não faz nada
+            } else if (selecao == 7) {
+                // Toggle música
+                // Menu não é fase média, então volume normal
+                definir_dificuldade_musica(0);
+                if (!audio_disponivel_global) {
+                    // Áudio não disponível - mostrar mensagem temporária
+                    clear();
+                    mvprintw(LINES / 2, COLS / 2 - 30, "Audio nao disponivel!");
+                    mvprintw(LINES / 2 + 1, COLS / 2 - 35, "Instale: sudo apt-get install libsdl2-mixer-dev");
+                    mvprintw(LINES / 2 + 3, COLS / 2 - 15, "Pressione qualquer tecla...");
+                    refresh();
+                    nodelay(stdscr, FALSE);
+                    getch();
+                    nodelay(stdscr, FALSE);
+                    timeout(-1);
+                } else if (musica_ligada_global) {
+                    parar_musica();
+                    musica_ligada_global = 0;
+                    definir_musica_ligada(0); // Notificar audio.c que música foi desligada
+                } else {
+                    definir_musica_ligada(1); // Notificar audio.c que música foi ligada
+                    if (tocar_musica("audio/Menu.mp3")) {
+                        musica_ligada_global = 1;
+                    } else {
+                        // Falha ao tocar música - mostrar mensagem
+                        clear();
+                        mvprintw(LINES / 2, COLS / 2 - 25, "Erro ao tocar musica!");
+                        mvprintw(LINES / 2 + 1, COLS / 2 - 20, "Verifique: audio/Menu.mp3");
+                        mvprintw(LINES / 2 + 3, COLS / 2 - 15, "Pressione qualquer tecla...");
+                        refresh();
+                        nodelay(stdscr, FALSE);
+                        getch();
+                        nodelay(stdscr, FALSE);
+                        timeout(-1);
+                    }
+                }
             } else if (selecao == 8) {
                 // Sair
                 return -1;
@@ -382,6 +428,42 @@ int mostrar_menu_principal(void) {
             return -1;
         } else if (ch == '1') {
             return 0; // Classico
+        } else if (ch == 'm' || ch == 'M') {
+            // Toggle música com tecla M
+            if (!audio_disponivel_global) {
+                // Áudio não disponível - mostrar mensagem temporária
+                clear();
+                mvprintw(LINES / 2, COLS / 2 - 30, "Audio nao disponivel!");
+                mvprintw(LINES / 2 + 1, COLS / 2 - 35, "Instale: sudo apt-get install libsdl2-mixer-dev");
+                mvprintw(LINES / 2 + 3, COLS / 2 - 15, "Pressione qualquer tecla...");
+                refresh();
+                nodelay(stdscr, FALSE);
+                getch();
+                nodelay(stdscr, FALSE);
+                timeout(-1);
+            } else if (musica_ligada_global) {
+                parar_musica();
+                musica_ligada_global = 0;
+                definir_musica_ligada(0); // Notificar audio.c que música foi desligada
+            } else {
+                // Menu não é fase média, então volume normal
+                definir_dificuldade_musica(0);
+                definir_musica_ligada(1); // Notificar audio.c que música foi ligada
+                if (tocar_musica("audio/Menu.mp3")) {
+                    musica_ligada_global = 1;
+                } else {
+                    // Falha ao tocar música
+                    clear();
+                    mvprintw(LINES / 2, COLS / 2 - 25, "Erro ao tocar musica!");
+                    mvprintw(LINES / 2 + 1, COLS / 2 - 20, "Verifique: audio/Menu.mp3");
+                    mvprintw(LINES / 2 + 3, COLS / 2 - 15, "Pressione qualquer tecla...");
+                    refresh();
+                    nodelay(stdscr, FALSE);
+                    getch();
+                    nodelay(stdscr, FALSE);
+                    timeout(-1);
+                }
+            }
         }
     }
 }

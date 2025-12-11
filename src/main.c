@@ -8,12 +8,19 @@
 #include <ncurses.h>
 #include "game.h"
 #include "ui.h"
+#include "audio.h"
 
 // Buffer de instrução global (compartilhado entre threads)
 // Aumentado para suportar comandos do formato T1B1M1:ppp
 char buffer_instrucao_global[64] = "";
 
+// Flag global para verificar se áudio está disponível
+int audio_disponivel_global = 0;
+
 int main(void) {
+    // Inicializar áudio (mas música começa desligada)
+    audio_disponivel_global = inicializar_audio();
+    
     GameState g;
     
     while (1) {
@@ -36,38 +43,79 @@ int main(void) {
         
         // Se escolheu Classico, mostrar menu de dificuldades
         if (modo_escolhido == 0) {
-            int dificuldade_escolhida = mostrar_menu_dificuldades();
-            if (dificuldade_escolhida == -1) {
+            int dificuldade_menu = mostrar_menu_dificuldades();
+            if (dificuldade_menu == -1) {
                 finalizar_ncurses();
                 continue; // Voltar ao menu principal
             }
+            
+            // Converter índice do menu para enum Dificuldade
+            Dificuldade dificuldade_escolhida;
+            switch (dificuldade_menu) {
+                case 0: // Fácil
+                    dificuldade_escolhida = DIFICULDADE_FACIL;
+                    break;
+                case 1: // Médio
+                    dificuldade_escolhida = DIFICULDADE_MEDIO;
+                    break;
+                case 2: // Difícil
+                    dificuldade_escolhida = DIFICULDADE_DIFICIL;
+                    break;
+                default:
+                    dificuldade_escolhida = DIFICULDADE_FACIL;
+                    break;
+            }
     
-    // Definir número de tedax e bancadas baseado na dificuldade
-    int num_tedax, num_bancadas;
-    switch (dificuldade_escolhida) {
-        case DIFICULDADE_FACIL:
-            num_tedax = 1;
-            num_bancadas = 1;
-            break;
-        case DIFICULDADE_MEDIO:
-            num_tedax = 2;
-            num_bancadas = 2;
-            break;
-        case DIFICULDADE_DIFICIL:
-            num_tedax = 3;
-            num_bancadas = 3;
-            break;
-        default:
-            num_tedax = 1;
-            num_bancadas = 1;
-            break;
-    }
-    
-    // Finalizar ncurses temporário (será reinicializado nas threads)
-    finalizar_ncurses();
-    
-    // Inicializar jogo com a dificuldade escolhida
-    inicializar_jogo(&g, dificuldade_escolhida, num_tedax, num_bancadas);
+            // Definir número de tedax e bancadas baseado na dificuldade
+            int num_tedax, num_bancadas;
+            switch (dificuldade_escolhida) {
+                case DIFICULDADE_FACIL:
+                    num_tedax = 1;
+                    num_bancadas = 1;
+                    break;
+                case DIFICULDADE_MEDIO:
+                    num_tedax = 2;
+                    num_bancadas = 2;
+                    break;
+                case DIFICULDADE_DIFICIL:
+                    num_tedax = 3;
+                    num_bancadas = 3;
+                    break;
+                default:
+                    num_tedax = 1;
+                    num_bancadas = 1;
+                    break;
+            }
+            
+            // Finalizar ncurses temporário (será reinicializado nas threads)
+            finalizar_ncurses();
+            
+            // Parar música do menu e tocar música da fase baseada na dificuldade
+            parar_musica();
+            
+            // Definir flag de fase média para ajuste de volume
+            definir_dificuldade_musica(dificuldade_escolhida == DIFICULDADE_MEDIO);
+            
+            const char* musica_fase = NULL;
+            switch (dificuldade_escolhida) {
+                case DIFICULDADE_FACIL:
+                    musica_fase = "audio/Fase_1.mp3";
+                    break;
+                case DIFICULDADE_MEDIO:
+                    musica_fase = "audio/Fase_2.mp3";
+                    break;
+                case DIFICULDADE_DIFICIL:
+                    musica_fase = "audio/Fase_3.mp3";
+                    break;
+            }
+            if (musica_fase && audio_disponivel_global) {
+                // Verificar se música está ligada antes de tocar
+                // Se estiver ligada, manter ligada; se não, tocar com volume 0
+                tocar_musica(musica_fase);
+            }
+            
+            // Inicializar jogo com a dificuldade escolhida
+            inicializar_jogo(&g, dificuldade_escolhida, num_tedax, num_bancadas);
     
     // Criar threads
     pthread_t thread_mural_id;
@@ -166,8 +214,34 @@ int main(void) {
             }
             pthread_mutex_unlock(&g.mutex_jogo);
             
-            // Mostrar menu pós-jogo
+            // Parar música da fase e tocar música de vitória/derrota
+            parar_musica();
+            if (audio_disponivel_global) {
+                if (vitoria) {
+                    tocar_musica_temporaria("audio/win.mp3");
+                } else {
+                    tocar_musica_temporaria("audio/failed.mp3");
+                }
+            }
+            
+            // Mostrar menu pós-jogo (bloqueante - espera usuário pressionar R ou Q)
             int opcao = mostrar_menu_pos_jogo(vitoria);
+            
+            // Após sair do menu, aguardar música temporária terminar (se ainda estiver tocando)
+            // e depois voltar para Menu.mp3
+            if (audio_disponivel_global) {
+                // Aguardar até a música temporária terminar
+                while (musica_tocando()) {
+                    struct timespec ts;
+                    ts.tv_sec = 0;
+                    ts.tv_nsec = 100000000L; // 0.1 segundos
+                    nanosleep(&ts, NULL);
+                }
+                // Voltar para Menu.mp3 (não é fase média, então volume normal)
+                definir_dificuldade_musica(0);
+                tocar_musica("audio/Menu.mp3");
+            }
+            
             finalizar_ncurses();
             
             if (opcao == 'q' || opcao == 'Q') {
@@ -181,7 +255,14 @@ int main(void) {
             // Outros modos em breve - por enquanto apenas fecha
             finalizar_ncurses();
         }
+        
+        // Parar música da fase ao sair do jogo
+        parar_musica();
     }
+    
+    // Finalizar áudio antes de sair
+    parar_musica();
+    finalizar_audio();
     
     return 0;
     finalizar_jogo(&g);

@@ -16,11 +16,17 @@ bomb_game/
 └── Makefile                     # Compilação
 ```
 
-### Instalação do ncurses (Ubuntu/Debian)
+### Instalação de Dependências (Ubuntu/Debian)
 
 ```bash
+# Biblioteca ncurses (obrigatória)
 sudo apt-get install libncurses5-dev libncursesw5-dev
+
+# Biblioteca SDL2_mixer (opcional - para suporte a música)
+sudo apt-get install libsdl2-mixer-dev
 ```
+
+**Nota**: O jogo funciona sem SDL2_mixer, mas a funcionalidade de música estará desabilitada. Veja `INSTALACAO_AUDIO.md` para mais detalhes.
 
 ## Compilação
 
