@@ -1,7 +1,7 @@
 #ifndef UI_H
 #define UI_H
 
-#include "game.h"
+#include "../game/game.h"
 
 // FUTURO: Esta função será uma thread (Exibição de Informações)
 // Desenha toda a interface do jogo na tela

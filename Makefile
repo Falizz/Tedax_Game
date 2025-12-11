@@ -1,10 +1,10 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -Isrc -pthread
+CFLAGS = -Wall -Wextra -std=c11 -Isrc/main -Isrc/game -Isrc/ui -Isrc/audio -Isrc/fases -pthread
 LDFLAGS = -lncurses -pthread
 TARGET = jogo
 SRCDIR = src
-SOURCES = $(SRCDIR)/main.c $(SRCDIR)/game.c $(SRCDIR)/ui.c $(SRCDIR)/audio.c $(SRCDIR)/fases.c
-OBJECTS = $(SOURCES:.c=.o)
+SOURCES = $(SRCDIR)/main/main.c $(SRCDIR)/game/game.c $(SRCDIR)/ui/ui.c $(SRCDIR)/audio/audio.c $(SRCDIR)/fases/fases.c
+OBJECTS = $(SRCDIR)/main/main.o $(SRCDIR)/game/game.o $(SRCDIR)/ui/ui.o $(SRCDIR)/audio/audio.o $(SRCDIR)/fases/fases.o
 
 # Verificar se SDL2_mixer está disponível
 # Primeiro tenta pkg-config, depois verifica diretamente os headers
@@ -44,7 +44,19 @@ all: $(TARGET)
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
 
-$(SRCDIR)/%.o: $(SRCDIR)/%.c
+$(SRCDIR)/main/main.o: $(SRCDIR)/main/main.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(SRCDIR)/game/game.o: $(SRCDIR)/game/game.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(SRCDIR)/ui/ui.o: $(SRCDIR)/ui/ui.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(SRCDIR)/audio/audio.o: $(SRCDIR)/audio/audio.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(SRCDIR)/fases/fases.o: $(SRCDIR)/fases/fases.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

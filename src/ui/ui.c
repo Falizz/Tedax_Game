@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "ui.h"
-#include "audio.h"
+#include "../game/game.h"
+#include "../audio/audio.h"
 #include <ncurses.h>
 #include <string.h>
 #include <time.h>
@@ -89,21 +90,11 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
                 mvprintw(linha++, 0, "    Desarmando M%d Botao %s - Tempo restante: %d segundos",
                          mod->id, nome_cor(mod->cor), mod->tempo_restante);
             }
-            // Mostrar fila de módulos em espera
-            if (t->qtd_fila > 0) {
-                mvprintw(linha++, 0, "    Fila: %d modulo(s) em espera", t->qtd_fila);
-                // Mostrar os primeiros 3 módulos da fila
-                int max_mostrar = (t->qtd_fila < 3) ? t->qtd_fila : 3;
-                for (int j = 0; j < max_mostrar; j++) {
-                    if (t->fila_modulos[j] >= 0 && t->fila_modulos[j] < g->qtd_modulos) {
-                        const Modulo *mod_fila = &g->modulos[t->fila_modulos[j]];
-                        mvprintw(linha++, 0, "      - M%d Botao %s",
-                                 mod_fila->id, nome_cor(mod_fila->cor));
-                    }
-                }
-                if (t->qtd_fila > 3) {
-                    mvprintw(linha++, 0, "      ... e mais %d", t->qtd_fila - 3);
-                }
+            // Mostrar módulo em espera (máximo 1)
+            if (t->qtd_fila > 0 && t->fila_modulos[0] >= 0 && t->fila_modulos[0] < g->qtd_modulos) {
+                const Modulo *mod_fila = &g->modulos[t->fila_modulos[0]];
+                mvprintw(linha++, 0, "    Em espera: M%d Botao %s",
+                         mod_fila->id, nome_cor(mod_fila->cor));
             }
             if (cores_disponiveis) {
                 attroff(COLOR_PAIR(3));

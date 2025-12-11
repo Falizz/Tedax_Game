@@ -1,7 +1,7 @@
 #ifndef FASES_H
 #define FASES_H
 
-#include "game.h"
+#include "../game/game.h"
 
 // Estrutura que contém todas as configurações de uma fase/dificuldade
 typedef struct {

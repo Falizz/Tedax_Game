@@ -6,10 +6,10 @@
 #include <time.h>
 #include <pthread.h>
 #include <ncurses.h>
-#include "game.h"
-#include "ui.h"
-#include "audio.h"
-#include "fases.h"
+#include "../game/game.h"
+#include "../ui/ui.h"
+#include "../audio/audio.h"
+#include "../fases/fases.h"
 
 // Buffer de instrução global (compartilhado entre threads)
 // Aumentado para suportar comandos do formato T1B1M1:ppp

@@ -1,6 +1,6 @@
 #include "game.h"
-#include "ui.h"
-#include "fases.h"
+#include "../ui/ui.h"
+#include "../fases/fases.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -38,9 +38,7 @@ void inicializar_jogo(GameState *g, Dificuldade dificuldade, int num_tedax, int 
         g->tedax[i].modulo_atual = -1;
         g->tedax[i].bancada_atual = -1;
         g->tedax[i].qtd_fila = 0; // Inicializar fila vazia
-        for (int j = 0; j < 10; j++) {
-            g->tedax[i].fila_modulos[j] = -1;
-        }
+        g->tedax[i].fila_modulos[0] = -1;
     }
     
     // Inicializar múltiplas bancadas
@@ -312,6 +310,21 @@ void* thread_tedax(void* arg) {
         if (tedax->estado == TEDAX_OCUPADO && tedax->modulo_atual >= 0) {
             Modulo *mod = &g->modulos[tedax->modulo_atual];
             
+            // Verificação de segurança: não processar módulos já resolvidos
+            if (mod->estado == MOD_RESOLVIDO) {
+                // Módulo já foi resolvido - liberar tedax e bancada
+                if (tedax->bancada_atual >= 0) {
+                    g->bancadas[tedax->bancada_atual].estado = BANCADA_LIVRE;
+                    g->bancadas[tedax->bancada_atual].tedax_ocupando = -1;
+                }
+                tedax->estado = TEDAX_LIVRE;
+                tedax->modulo_atual = -1;
+                tedax->bancada_atual = -1;
+                pthread_mutex_unlock(&g->mutex_jogo);
+                nanosleep(&ts, NULL);
+                continue;
+            }
+            
             // Verificar se o módulo está realmente em execução
             // Se não estiver, significa que acabou de ser atribuído e precisa ser iniciado
             if (mod->estado != MOD_EM_EXECUCAO) {
@@ -391,64 +404,75 @@ void* thread_tedax(void* arg) {
                     pthread_cond_broadcast(&g->cond_bancada_disponivel);
                 }
                 
-                // Verificar se há módulos na fila deste tedax
+                // Verificar se há módulos na fila deste tedax (máximo 1)
                 if (tedax->qtd_fila > 0) {
-                    // Pegar o próximo módulo da fila
+                    // Pegar o módulo da fila (só há 1)
                     int proximo_modulo_idx = tedax->fila_modulos[0];
                     
-                    // Remover da fila (shift left)
-                    for (int i = 0; i < tedax->qtd_fila - 1; i++) {
-                        tedax->fila_modulos[i] = tedax->fila_modulos[i + 1];
-                    }
-                    tedax->qtd_fila--;
-                    tedax->fila_modulos[tedax->qtd_fila] = -1;
-                    
-                    // Atribuir o próximo módulo ao tedax
-                    Modulo *prox_mod = &g->modulos[proximo_modulo_idx];
-                    
-                    // Verificar se a bancada ainda está disponível
-                    if (tedax->bancada_atual >= 0 && 
-                        g->bancadas[tedax->bancada_atual].estado == BANCADA_LIVRE) {
-                        // Bancada ainda livre: continuar usando
-                        tedax->modulo_atual = proximo_modulo_idx;
-                        prox_mod->estado = MOD_EM_EXECUCAO;
-                        prox_mod->tempo_restante = prox_mod->tempo_total;
-                        g->bancadas[tedax->bancada_atual].estado = BANCADA_OCUPADA;
-                        g->bancadas[tedax->bancada_atual].tedax_ocupando = tedax->id;
-                    } else {
-                        // Bancada não está mais disponível: procurar outra ou entrar em espera
-                        int bancada_encontrada = 0;
-                        for (int i = 0; i < g->qtd_bancadas; i++) {
-                            if (g->bancadas[i].estado == BANCADA_LIVRE) {
-                                tedax->modulo_atual = proximo_modulo_idx;
-                                tedax->bancada_atual = i;
-                                prox_mod->estado = MOD_EM_EXECUCAO;
-                                prox_mod->tempo_restante = prox_mod->tempo_total;
-                                g->bancadas[i].estado = BANCADA_OCUPADA;
-                                g->bancadas[i].tedax_ocupando = tedax->id;
-                                bancada_encontrada = 1;
-                                break;
-                            }
-                        }
+                    // Verificar se o módulo é válido
+                    if (proximo_modulo_idx >= 0 && proximo_modulo_idx < g->qtd_modulos) {
+                        // Atribuir o próximo módulo ao tedax
+                        Modulo *prox_mod = &g->modulos[proximo_modulo_idx];
                         
-                        if (!bancada_encontrada) {
-                            // Nenhuma bancada livre: entrar em espera na primeira disponível
-                            if (g->qtd_bancadas > 0) {
-                                int bancada_idx = 0;
+                        // Verificação de segurança: não processar módulos já resolvidos
+                        if (prox_mod->estado == MOD_RESOLVIDO) {
+                            // Módulo já foi resolvido - limpar fila
+                            tedax->fila_modulos[0] = -1;
+                            tedax->qtd_fila = 0;
+                        } else {
+                            // Remover o módulo da fila
+                            tedax->fila_modulos[0] = -1;
+                            tedax->qtd_fila = 0;
+                            
+                            // Verificar se a bancada ainda está disponível
+                            if (tedax->bancada_atual >= 0 && 
+                                g->bancadas[tedax->bancada_atual].estado == BANCADA_LIVRE) {
+                                // Bancada ainda livre: continuar usando
                                 tedax->modulo_atual = proximo_modulo_idx;
-                                tedax->bancada_atual = bancada_idx;
-                                tedax->estado = TEDAX_ESPERANDO;
                                 prox_mod->estado = MOD_EM_EXECUCAO;
                                 prox_mod->tempo_restante = prox_mod->tempo_total;
-                                g->bancadas[bancada_idx].tedax_esperando = tedax->id;
+                                g->bancadas[tedax->bancada_atual].estado = BANCADA_OCUPADA;
+                                g->bancadas[tedax->bancada_atual].tedax_ocupando = tedax->id;
                             } else {
-                                // Sem bancadas: voltar módulo para pendente
-                                prox_mod->estado = MOD_PENDENTE;
-                                tedax->modulo_atual = -1;
-                                tedax->bancada_atual = -1;
-                                tedax->estado = TEDAX_LIVRE;
+                                // Bancada não está mais disponível: procurar outra ou entrar em espera
+                                int bancada_encontrada = 0;
+                                for (int i = 0; i < g->qtd_bancadas; i++) {
+                                    if (g->bancadas[i].estado == BANCADA_LIVRE) {
+                                        tedax->modulo_atual = proximo_modulo_idx;
+                                        tedax->bancada_atual = i;
+                                        prox_mod->estado = MOD_EM_EXECUCAO;
+                                        prox_mod->tempo_restante = prox_mod->tempo_total;
+                                        g->bancadas[i].estado = BANCADA_OCUPADA;
+                                        g->bancadas[i].tedax_ocupando = tedax->id;
+                                        bancada_encontrada = 1;
+                                        break;
+                                    }
+                                }
+                                
+                                if (!bancada_encontrada) {
+                                    // Nenhuma bancada livre: entrar em espera na primeira disponível
+                                    if (g->qtd_bancadas > 0) {
+                                        int bancada_idx = 0;
+                                        tedax->modulo_atual = proximo_modulo_idx;
+                                        tedax->bancada_atual = bancada_idx;
+                                        tedax->estado = TEDAX_ESPERANDO;
+                                        prox_mod->estado = MOD_EM_EXECUCAO;
+                                        prox_mod->tempo_restante = prox_mod->tempo_total;
+                                        g->bancadas[bancada_idx].tedax_esperando = tedax->id;
+                                    } else {
+                                        // Sem bancadas: voltar módulo para pendente
+                                        prox_mod->estado = MOD_PENDENTE;
+                                        tedax->modulo_atual = -1;
+                                        tedax->bancada_atual = -1;
+                                        tedax->estado = TEDAX_LIVRE;
+                                    }
+                                }
                             }
                         }
+                    } else {
+                        // Módulo inválido - limpar fila
+                        tedax->fila_modulos[0] = -1;
+                        tedax->qtd_fila = 0;
                     }
                 } else {
                     // Não há módulos na fila: liberar tedax
@@ -677,6 +701,10 @@ void* thread_coordenador(void* arg) {
                         valido = 0;
                     } else if (g->modulos[modulo_idx].estado != MOD_PENDENTE) {
                         valido = 0; // Módulo especificado não está pendente
+                        // Verificação adicional: não permitir módulos já resolvidos
+                        if (g->modulos[modulo_idx].estado == MOD_RESOLVIDO) {
+                            valido = 0; // Módulo já foi resolvido
+                        }
                     }
                     
                     if (valido && strlen(instrucao) > 0) {
@@ -691,15 +719,20 @@ void* thread_coordenador(void* arg) {
                         // Verificar se o tedax está ocupado
                         if (t->estado == TEDAX_OCUPADO) {
                             // Tedax ocupado: adicionar módulo à fila
-                            if (t->qtd_fila < 10) {
-                                t->fila_modulos[t->qtd_fila] = modulo_idx;
-                                t->qtd_fila++;
-                                mod->estado = MOD_EM_EXECUCAO; // Módulo em espera na fila
-                                mod->tempo_restante = mod->tempo_total;
-                            } else {
-                                // Fila cheia - erro
-                                strncpy(g->mensagem_erro, "Fila do Tedax cheia", 63);
+                            
+                            // Verificar se já há um módulo na fila (máximo 1)
+                            if (t->qtd_fila > 0) {
+                                // Já há um módulo na fila - erro
+                                strncpy(g->mensagem_erro, "Tedax ja tem modulo em espera", 63);
                                 g->mensagem_erro[63] = '\0';
+                            } else {
+                                // Adicionar à fila
+                                t->fila_modulos[0] = modulo_idx;
+                                t->qtd_fila = 1;
+                                // Módulo permanece PENDENTE até ser processado pelo tedax
+                                // Não mudar para MOD_EM_EXECUCAO ainda - isso só acontece quando o tedax começar a processá-lo
+                                mod->estado = MOD_PENDENTE;
+                                mod->tempo_restante = mod->tempo_total;
                             }
                         } else {
                             // Tedax livre ou em espera: atribuir normalmente

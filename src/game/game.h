@@ -61,8 +61,8 @@ typedef struct {
     pthread_t thread_id;        // ID da thread deste tedax
     
     // Fila de módulos em espera para este tedax
-    int fila_modulos[10];      // índices dos módulos em espera
-    int qtd_fila;               // quantidade de módulos na fila
+    int fila_modulos[1];        // índice do módulo em espera (máximo 1 módulo)
+    int qtd_fila;               // quantidade de módulos na fila (0 ou 1)
 } Tedax;
 
 // Estrutura que representa uma bancada

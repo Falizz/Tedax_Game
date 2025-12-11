@@ -1,4 +1,5 @@
 #include "fases.h"
+#include "../game/game.h"
 
 // Configurações para cada dificuldade/fase
 static const ConfigFase config_fases[] = {
