@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -Isrc
-LDFLAGS = -lncurses
+CFLAGS = -Wall -Wextra -std=c11 -Isrc -pthread
+LDFLAGS = -lncurses -pthread
 TARGET = jogo
 SRCDIR = src
 SOURCES = $(SRCDIR)/main.c $(SRCDIR)/game.c $(SRCDIR)/ui.c

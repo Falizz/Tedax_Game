@@ -4,96 +4,24 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
 #include <ncurses.h>
 #include "game.h"
 #include "ui.h"
 
-// Processa a entrada do teclado e atualiza o buffer de instrução
-void processar_entrada(GameState *g, char *buffer_instrucao, int *buffer_len) {
-    int ch = getch();
-    
-    if (ch == ERR) {
-        return;
-    }
-    
-    // Tecla 'q' para sair (sempre permitida)
-    if (ch == 'q' || ch == 'Q') {
-        g->tempo_restante = 0; // Forçar fim do jogo
-        return;
-    }
-    
-    // Se o tedax estiver ocupado, desabilitar todos os outros inputs
-    if (g->tedax.estado == TEDAX_OCUPADO) {
-        return;
-    }
-    
-    // Processar BACKSPACE
-    if (ch == KEY_BACKSPACE || ch == 127 || ch == '\b') {
-        if (*buffer_len > 0) {
-            (*buffer_len)--;
-            buffer_instrucao[*buffer_len] = '\0';
-        }
-    }
-    // Processar ENTER para enviar instrução
-    else if (ch == '\n' || ch == '\r') {
-        // Verificar se o tedax está livre
-        if (g->tedax.estado == TEDAX_LIVRE) {
-            // Procurar o primeiro módulo pendente
-            int modulo_encontrado = -1;
-            for (int i = 0; i < g->qtd_modulos; i++) {
-                if (g->modulos[i].estado == MOD_PENDENTE) {
-                    modulo_encontrado = i;
-                    break;
-                }
-            }
-            
-            if (modulo_encontrado >= 0) {
-                // Designar módulo para o tedax
-                Modulo *mod = &g->modulos[modulo_encontrado];
-                
-                // Copiar instrução digitada
-                strncpy(mod->instrucao_digitada, buffer_instrucao, 15);
-                mod->instrucao_digitada[15] = '\0';
-                
-                // Mudar estado do módulo
-                mod->estado = MOD_EM_EXECUCAO;
-                mod->tempo_restante = mod->tempo_total;
-                
-                // Ocupar tedax
-                g->tedax.estado = TEDAX_OCUPADO;
-                g->tedax.modulo_atual = modulo_encontrado;
-                
-                // Limpar buffer
-                *buffer_len = 0;
-                buffer_instrucao[0] = '\0';
-            }
-            // Se não há módulos pendentes, ignorar ENTER
-        }
-    }
-    // Aceitar qualquer caractere imprimível (exceto caracteres de controle)
-    else if (ch >= 32 && ch <= 126) { // Caracteres imprimíveis ASCII
-        if (*buffer_len < 15) { // Limite do buffer
-            buffer_instrucao[*buffer_len] = (char)ch;
-            (*buffer_len)++;
-            buffer_instrucao[*buffer_len] = '\0';
-        }
-    }
-}
+// Buffer de instrução global (compartilhado entre threads)
+char buffer_instrucao_global[16] = "";
 
 int main(void) {
     GameState g;
-    char buffer_instrucao[16] = "";
-    int buffer_len = 0;
     
-    // Inicializar ncurses
+    // Inicializar ncurses temporariamente para o menu
     inicializar_ncurses();
-    
-    // Inicializar cores (se disponível)
     if (has_colors()) {
         start_color();
-        init_pair(1, COLOR_CYAN, COLOR_BLACK);    // Tempo restante
-        init_pair(2, COLOR_GREEN, COLOR_BLACK);   // Livre/Sucesso
-        init_pair(3, COLOR_YELLOW, COLOR_BLACK);  // Ocupado/Atenção
+        init_pair(1, COLOR_CYAN, COLOR_BLACK);
+        init_pair(2, COLOR_GREEN, COLOR_BLACK);
+        init_pair(3, COLOR_YELLOW, COLOR_BLACK);
     }
     
     // Mostrar menu inicial e obter dificuldade
@@ -104,65 +32,112 @@ int main(void) {
         return 0;
     }
     
+    // Por enquanto, usar valores padrão (depois pode ser configurável)
+    int num_tedax = 1;
+    int num_bancadas = 1;
+    
+    // Finalizar ncurses temporário (será reinicializado nas threads)
+    finalizar_ncurses();
+    
     // Inicializar jogo com a dificuldade escolhida
-    inicializar_jogo(&g, (Dificuldade)dificuldade_escolhida);
+    inicializar_jogo(&g, dificuldade_escolhida, num_tedax, num_bancadas);
     
-    // Contador de ticks (5 ticks = 1 segundo, pois tick = 0.2s)
+    // Criar threads
+    pthread_t thread_mural_id;
+    pthread_t thread_exibicao_id;
+    pthread_t thread_tedax_ids[3];
+    pthread_t thread_coordenador_id;
+    
+    // Thread do Mural
+    pthread_create(&thread_mural_id, NULL, thread_mural, &g);
+    
+    // Thread de Exibição
+    pthread_create(&thread_exibicao_id, NULL, thread_exibicao, &g);
+    
+    // Threads dos Tedax
+    for (int i = 0; i < g.qtd_tedax; i++) {
+        typedef struct {
+            GameState *g;
+            int tedax_id;
+        } TedaxArgs;
+        
+        TedaxArgs *args = malloc(sizeof(TedaxArgs));
+        args->g = &g;
+        args->tedax_id = i;
+        pthread_create(&thread_tedax_ids[i], NULL, thread_tedax, args);
+    }
+    
+    // Thread do Coordenador
+    pthread_create(&thread_coordenador_id, NULL, thread_coordenador, &g);
+    
+    // Thread principal: controla o tempo e verifica condições de vitória/derrota
     int tick_count = 0;
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 200000000L; // 0.2 segundos
     
-    // Loop principal do jogo
-    while (g.tempo_restante > 0) {
-        // 1) FUTURO: Thread do Coordenador - ler tecla e atualizar buffer/ações
-        processar_entrada(&g, buffer_instrucao, &buffer_len);
-        
-        // 2) FUTURO: Thread do Mural - gerar módulos de tempos em tempos
-        atualizar_mural(&g);
-        
-        // 3) FUTURO: Thread do Tedax - atualizar execução do tedax
-        atualizar_tedax(&g);
-        
-        // 4) FUTURO: Thread de Exibição - redesenhar a tela
-        desenhar_tela(&g, buffer_instrucao);
-        
-        // 5) Checar condição de vitória
-        if (todos_modulos_resolvidos(&g) && g.qtd_modulos > 0) {
-            mostrar_mensagem_vitoria();
-            break;
-        }
-        
-        // 6) Esperar 0.2 segundos (tick de 200ms - 5 ticks por segundo)
-        struct timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 200000000L; // 200ms em nanossegundos
+    while (g.jogo_rodando && !g.jogo_terminou) {
         nanosleep(&ts, NULL);
         
-        // Decrementar tempos apenas a cada 5 ticks (1 segundo completo)
         tick_count++;
-        if (tick_count >= 5) {
+        if (tick_count >= 5) { // 1 segundo
+            pthread_mutex_lock(&g.mutex_jogo);
+            
             g.tempo_restante--;
             
-            // Decrementar tempo do módulo em execução também
-            if (g.tedax.estado == TEDAX_OCUPADO && g.tedax.modulo_atual >= 0) {
-                g.modulos[g.tedax.modulo_atual].tempo_restante--;
+            // Verificar condições de fim de jogo
+            if (todos_modulos_resolvidos(&g) && g.qtd_modulos > 0) {
+                g.jogo_terminou = 1;
+                g.jogo_rodando = 0;
+                pthread_mutex_unlock(&g.mutex_jogo);
+                break;
             }
             
+            if (g.tempo_restante <= 0) {
+                g.jogo_terminou = 1;
+                g.jogo_rodando = 0;
+                pthread_mutex_unlock(&g.mutex_jogo);
+                break;
+            }
+            
+            pthread_mutex_unlock(&g.mutex_jogo);
             tick_count = 0;
         }
     }
     
-    // Verificar se perdeu (tempo acabou e ainda há módulos não resolvidos)
-    if (!todos_modulos_resolvidos(&g) && g.qtd_modulos > 0) {
+    // Aguardar todas as threads terminarem
+    pthread_join(thread_mural_id, NULL);
+    pthread_join(thread_exibicao_id, NULL);
+    for (int i = 0; i < g.qtd_tedax; i++) {
+        pthread_join(thread_tedax_ids[i], NULL);
+    }
+    pthread_join(thread_coordenador_id, NULL);
+    
+    // Mostrar mensagem final (ncurses já foi finalizado pela thread de exibição)
+    // Reinicializar para mostrar mensagem
+    inicializar_ncurses();
+    if (has_colors()) {
+        start_color();
+        init_pair(1, COLOR_CYAN, COLOR_BLACK);
+        init_pair(2, COLOR_GREEN, COLOR_BLACK);
+        init_pair(3, COLOR_YELLOW, COLOR_BLACK);
+    }
+    
+    pthread_mutex_lock(&g.mutex_jogo);
+    if (todos_modulos_resolvidos(&g) && g.qtd_modulos > 0) {
+        mostrar_mensagem_vitoria();
+    } else if (g.qtd_modulos > 0) {
         mostrar_mensagem_derrota();
-    } else if (g.qtd_modulos == 0) {
-        // Caso especial: tempo acabou mas nenhum módulo foi gerado
+    } else {
         clear();
         mvprintw(LINES / 2, COLS / 2 - 15, "Tempo esgotado - Nenhum modulo gerado");
         refresh();
         sleep(2);
     }
+    pthread_mutex_unlock(&g.mutex_jogo);
     
-    // Finalizar ncurses
     finalizar_ncurses();
+    finalizar_jogo(&g);
     
     printf("Fim da execucao\n");
     return 0;

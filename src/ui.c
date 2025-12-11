@@ -23,7 +23,6 @@ void finalizar_ncurses(void) {
     endwin();
 }
 
-// FUTURO: Esta função será uma thread (Exibição de Informações)
 // Desenha toda a interface do jogo na tela
 void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
     clear();
@@ -53,28 +52,55 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
     }
     linha++;
     
-    // Estado do Tedax
-    mvprintw(linha++, 0, "--- TEDAX ---");
-    if (g->tedax.estado == TEDAX_LIVRE) {
-        if (cores_disponiveis) {
-            attron(COLOR_PAIR(2)); // Verde
+    // Estado dos Tedax
+    mvprintw(linha++, 0, "--- TEDAX (%d total) ---", g->qtd_tedax);
+    for (int i = 0; i < g->qtd_tedax; i++) {
+        const Tedax *t = &g->tedax[i];
+        if (t->estado == TEDAX_LIVRE) {
+            if (cores_disponiveis) {
+                attron(COLOR_PAIR(2)); // Verde
+            }
+            mvprintw(linha++, 0, "  Tedax %d: LIVRE", t->id);
+            if (cores_disponiveis) {
+                attroff(COLOR_PAIR(2));
+            }
+        } else {
+            if (cores_disponiveis) {
+                attron(COLOR_PAIR(3)); // Amarelo/Vermelho
+            }
+            mvprintw(linha++, 0, "  Tedax %d: OCUPADO", t->id);
+            if (t->modulo_atual >= 0) {
+                const Modulo *mod = &g->modulos[t->modulo_atual];
+                mvprintw(linha++, 0, "    Desarmando modulo %d (%s) - Tempo restante: %d segundos",
+                         mod->id, nome_cor(mod->cor), mod->tempo_restante);
+            }
+            if (cores_disponiveis) {
+                attroff(COLOR_PAIR(3));
+            }
         }
-        mvprintw(linha++, 0, "  Estado: LIVRE");
-        if (cores_disponiveis) {
-            attroff(COLOR_PAIR(2));
-        }
-    } else {
-        if (cores_disponiveis) {
-            attron(COLOR_PAIR(3)); // Amarelo/Vermelho
-        }
-        mvprintw(linha++, 0, "  Estado: OCUPADO");
-        if (g->tedax.modulo_atual >= 0) {
-            const Modulo *mod = &g->modulos[g->tedax.modulo_atual];
-            mvprintw(linha++, 0, "  Desarmando modulo %d (%s) - Tempo restante: %d segundos",
-                     mod->id, nome_cor(mod->cor), mod->tempo_restante);
-        }
-        if (cores_disponiveis) {
-            attroff(COLOR_PAIR(3));
+    }
+    linha++;
+    
+    // Estado das Bancadas
+    mvprintw(linha++, 0, "--- BANCADAS (%d total) ---", g->qtd_bancadas);
+    for (int i = 0; i < g->qtd_bancadas; i++) {
+        const Bancada *b = &g->bancadas[i];
+        if (b->estado == BANCADA_LIVRE) {
+            if (cores_disponiveis) {
+                attron(COLOR_PAIR(2));
+            }
+            mvprintw(linha++, 0, "  Bancada %d: LIVRE", b->id);
+            if (cores_disponiveis) {
+                attroff(COLOR_PAIR(2));
+            }
+        } else {
+            if (cores_disponiveis) {
+                attron(COLOR_PAIR(3));
+            }
+            mvprintw(linha++, 0, "  Bancada %d: OCUPADA (Tedax %d)", b->id, b->tedax_ocupando);
+            if (cores_disponiveis) {
+                attroff(COLOR_PAIR(3));
+            }
         }
     }
     linha++;
@@ -82,10 +108,37 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
     // Lista de módulos
     mvprintw(linha++, 0, "--- MODULOS (%d total) ---", g->qtd_modulos);
     
+    // Primeiro, contar quantos módulos resolvidos estão dentro do tempo limite de 20s
+    int resolvidos_visiveis_20s = 0;
+    for (int i = 0; i < g->qtd_modulos; i++) {
+        const Modulo *mod = &g->modulos[i];
+        if (mod->estado == MOD_RESOLVIDO && mod->tempo_desde_resolvido >= 0 && mod->tempo_desde_resolvido < 20) {
+            resolvidos_visiveis_20s++;
+        }
+    }
+    
+    // Determinar tempo limite para remoção (10s se tiver 8-9 resolvidos, 20s caso contrário)
+    int tempo_limite_remocao = (resolvidos_visiveis_20s >= 8) ? 10 : 20;
+    
     int pendentes = 0, em_execucao = 0, resolvidos = 0;
+    int modulos_exibidos = 0;
+    int modulos_nao_exibidos = 0;
     
     for (int i = 0; i < g->qtd_modulos; i++) {
         const Modulo *mod = &g->modulos[i];
+        
+        // Filtrar módulos resolvidos que já passaram do tempo limite
+        int deve_exibir = 1;
+        if (mod->estado == MOD_RESOLVIDO) {
+            if (mod->tempo_desde_resolvido < 0 || mod->tempo_desde_resolvido >= tempo_limite_remocao) {
+                deve_exibir = 0; // Não exibir módulos resolvidos antigos
+                modulos_nao_exibidos++;
+            }
+        }
+        
+        if (!deve_exibir) {
+            continue; // Pular módulos resolvidos antigos
+        }
         
         switch (mod->estado) {
             case MOD_PENDENTE:
@@ -113,12 +166,30 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
         }
         
         linha++;
+        modulos_exibidos++;
         
         // Limitar quantidade de módulos exibidos para não ultrapassar a tela
         if (linha >= LINES - 8) {
-            mvprintw(linha++, 0, "  ... (mais %d modulos)", g->qtd_modulos - i - 1);
+            // Contar quantos módulos ainda não foram processados
+            int restantes = 0;
+            for (int j = i + 1; j < g->qtd_modulos; j++) {
+                const Modulo *mod_rest = &g->modulos[j];
+                if (mod_rest->estado != MOD_RESOLVIDO || 
+                    (mod_rest->tempo_desde_resolvido >= 0 && mod_rest->tempo_desde_resolvido < tempo_limite_remocao)) {
+                    restantes++;
+                }
+            }
+            if (restantes > 0) {
+                mvprintw(linha++, 0, "  ... (mais %d modulos)", restantes);
+            }
             break;
         }
+    }
+    
+    // Se houver módulos não exibidos (resolvidos antigos), informar
+    if (modulos_nao_exibidos > 0) {
+        linha++;
+        mvprintw(linha++, 0, "  (%d resolvidos removidos)", modulos_nao_exibidos);
     }
     
     linha++;
@@ -129,14 +200,23 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
     linha++;
     
     // Área de entrada
-    if (g->tedax.estado == TEDAX_OCUPADO) {
-        // Input desabilitado quando tedax está ocupado
+    // Verificar se há algum tedax livre
+    int tem_tedax_livre = 0;
+    for (int i = 0; i < g->qtd_tedax; i++) {
+        if (g->tedax[i].estado == TEDAX_LIVRE) {
+            tem_tedax_livre = 1;
+            break;
+        }
+    }
+    
+    if (!tem_tedax_livre) {
+        // Input desabilitado quando todos os tedax estão ocupados
         if (cores_disponiveis) {
             attron(COLOR_PAIR(3)); // Amarelo/Vermelho para indicar desabilitado
         } else {
             attron(A_DIM); // Texto com menos brilho
         }
-        mvprintw(linha++, 0, "Instrucao: [DESABILITADO - Tedax ocupado]");
+        mvprintw(linha++, 0, "Instrucao: [DESABILITADO - Todos os tedax ocupados]");
         if (cores_disponiveis) {
             attroff(COLOR_PAIR(3));
         } else {
