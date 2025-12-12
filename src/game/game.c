@@ -102,15 +102,42 @@ void gerar_novo_modulo(GameState *g) {
     novo->tempo_total = config->tempo_minimo_execucao + (rand() % (config->tempo_variacao_execucao + 1));
     novo->tempo_restante = novo->tempo_total;
     
-    // Escolher tipo de módulo aleatoriamente
-    // 40% botão, 30% senha, 30% fios
-    int tipo_aleatorio = rand() % 10;
-    if (tipo_aleatorio < 4) {
-        gerar_modulo_botao(novo, g->dificuldade);
-    } else if (tipo_aleatorio < 7) {
-        gerar_modulo_senha(novo, g->dificuldade);
-    } else {
-        gerar_modulo_fios(novo, g->dificuldade);
+    // Escolher tipo de módulo aleatoriamente com pesos por dificuldade
+    // fácil: 40% fios, 40% botão, 20% hash
+    // médio: 40% fios, 30% botão, 30% hash
+    // difícil: 40% fios, 20% botão, 40% hash
+    int tipo_aleatorio = rand() % 100;
+    switch (g->dificuldade) {
+        case DIFICULDADE_FACIL:
+            if (tipo_aleatorio < 40) {
+                gerar_modulo_fios(novo, g->dificuldade);
+            } else if (tipo_aleatorio < 80) {
+                gerar_modulo_botao(novo, g->dificuldade);
+            } else {
+                gerar_modulo_senha(novo, g->dificuldade);
+            }
+            break;
+        case DIFICULDADE_MEDIO:
+            if (tipo_aleatorio < 40) {
+                gerar_modulo_fios(novo, g->dificuldade);
+            } else if (tipo_aleatorio < 70) {
+                gerar_modulo_botao(novo, g->dificuldade);
+            } else {
+                gerar_modulo_senha(novo, g->dificuldade);
+            }
+            break;
+        case DIFICULDADE_DIFICIL:
+            if (tipo_aleatorio < 40) {
+                gerar_modulo_fios(novo, g->dificuldade);
+            } else if (tipo_aleatorio < 60) {
+                gerar_modulo_botao(novo, g->dificuldade);
+            } else {
+                gerar_modulo_senha(novo, g->dificuldade);
+            }
+            break;
+        default:
+            gerar_modulo_botao(novo, g->dificuldade);
+            break;
     }
     
     // Limpar instrução digitada

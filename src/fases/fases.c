@@ -7,10 +7,10 @@ static const ConfigFase config_fases[] = {
     {
         .num_tedax = 2,
         .num_bancadas = 1,
-        .modulos_necessarios = 4,
-        .intervalo_geracao = 65,        // 13 segundos (65 ticks * 0.2s)
-        .modulos_iniciais = 1,
-        .tempo_total_partida = 150,      // em Segundos
+        .modulos_necessarios = 6,
+        .intervalo_geracao = 130,        // 26 segundos (130 ticks * 0.2s)
+        .modulos_iniciais = 2,
+        .tempo_total_partida = 120,      // em Segundos
         .tempo_minimo_execucao = 3,     // 3 segundos mínimo
         .tempo_variacao_execucao = 8    // Variação de 0 a 8 segundos
     },
@@ -19,10 +19,10 @@ static const ConfigFase config_fases[] = {
     {
         .num_tedax = 3,
         .num_bancadas = 2,
-        .modulos_necessarios = 8,
-        .intervalo_geracao = 50,        // 10 segundos (50 ticks * 0.2s)
-        .modulos_iniciais = 2,
-        .tempo_total_partida = 240,     // em Segundos
+        .modulos_necessarios = 10,
+        .intervalo_geracao = 100,        // 20 segundos (100 ticks * 0.2s)
+        .modulos_iniciais = 3,
+        .tempo_total_partida = 180,     // em Segundos
         .tempo_minimo_execucao = 5,     // 5 segundos mínimo (+2 do fácil)
         .tempo_variacao_execucao = 15   // Variação de 0 a 15 segundos (50% mais que fácil)
     },
@@ -31,10 +31,10 @@ static const ConfigFase config_fases[] = {
     {
         .num_tedax = 4,
         .num_bancadas = 3,
-        .modulos_necessarios = 12,
-        .intervalo_geracao = 35,        // 7 segundos (35 ticks * 0.2s)
-        .modulos_iniciais = 3,
-        .tempo_total_partida = 360,     // em Segundos
+        .modulos_necessarios = 15,
+        .intervalo_geracao = 70,        // 14 segundos (70 ticks * 0.2s)
+        .modulos_iniciais = 5,
+        .tempo_total_partida = 210,     // em Segundos
         .tempo_minimo_execucao = 9,     // 9 segundos mínimo (+4 do fácil)
         .tempo_variacao_execucao = 20   // Variação de 0 a 20 segundos (100% mais que fácil)
     }

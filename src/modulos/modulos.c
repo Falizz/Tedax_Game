@@ -25,16 +25,16 @@ static void gerar_sequencia_senha(char *buffer, int tamanho_max, Dificuldade dif
     int tamanho;
     switch (dificuldade) {
         case DIFICULDADE_FACIL:
-            tamanho = 3 + (rand() % 2); // 3 ou 4 caracteres
+            tamanho = 4 + (rand() % 2); // 3 ou 4 caracteres
             break;
         case DIFICULDADE_MEDIO:
-            tamanho = 4 + (rand() % 2); // 4 ou 5 caracteres
+            tamanho = 6 + (rand() % 2); // 4 ou 5 caracteres
             break;
         case DIFICULDADE_DIFICIL:
-            tamanho = 5 + (rand() % 2); // 5 ou 6 caracteres
+            tamanho = 8 + (rand() % 2); // 5 ou 6 caracteres
             break;
         default:
-            tamanho = 4;
+            tamanho = 4; // Padrão
             break;
     }
     
