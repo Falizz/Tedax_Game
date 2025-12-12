@@ -11,12 +11,29 @@ typedef enum {
     MOD_RESOLVIDO
 } EstadoModulo;
 
+// Tipos de módulos disponíveis
+typedef enum {
+    TIPO_BOTAO,
+    TIPO_SENHA,
+    TIPO_FIOS
+} TipoModulo;
+
 // Cores possíveis do botão
 typedef enum {
     COR_VERMELHO,
     COR_VERDE,
     COR_AZUL
 } CorBotao;
+
+// Cores para módulo de fios
+typedef enum {
+    COR_FIO_VERMELHO = 0,
+    COR_FIO_VERDE = 1,
+    COR_FIO_AZUL = 2,
+    COR_FIO_AMARELO = 3,
+    COR_FIO_BRANCO = 4,
+    COR_FIO_PRETO = 5
+} CorFio;
 
 // Estados possíveis do tedax
 typedef enum {
@@ -38,16 +55,43 @@ typedef enum {
     DIFICULDADE_DIFICIL
 } Dificuldade;
 
+// Dados específicos do módulo de botão
+typedef struct {
+    CorBotao cor;
+} DadosBotao;
+
+// Dados específicos do módulo de senha
+typedef struct {
+    char hash[32];              // hash exibido (ex: "SAESI")
+    char senha_correta[16];     // senha numérica correta (ex: "54351")
+    char mapeamento[256];       // mapeamento de caracteres para números (para validação)
+} DadosSenha;
+
+// Dados específicos do módulo de fios
+typedef struct {
+    char sequencia[32];         // sequência de cores (ex: "/R/G/B/Y/W/")
+    int padrao;                 // padrão de regra usado (0-4)
+    char instrucao_correta[16]; // instrução correta baseada no padrão
+} DadosFios;
+
+// Union para dados específicos de cada tipo de módulo
+typedef union {
+    DadosBotao botao;
+    DadosSenha senha;
+    DadosFios fios;
+} DadosModulo;
+
 // Estrutura que representa um módulo da bomba
 typedef struct {
     int id;
-    CorBotao cor;
+    TipoModulo tipo;            // tipo do módulo
     int tempo_total;            // tempo necessário para desarmar (em segundos)
     int tempo_restante;         // tempo restante quando estiver em execução
     EstadoModulo estado;
     
-    char instrucao_correta[4];  // "p", "pp" ou "ppp"
-    char instrucao_digitada[16]; // o que o jogador enviou para este módulo
+    DadosModulo dados;          // dados específicos do tipo de módulo
+    char instrucao_correta[32]; // instrução correta (pode variar por tipo)
+    char instrucao_digitada[32]; // o que o jogador enviou para este módulo
     
     int tempo_desde_resolvido;
 } Modulo;

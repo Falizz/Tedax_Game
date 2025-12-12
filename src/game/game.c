@@ -1,6 +1,7 @@
 #include "game.h"
 #include "../ui/ui.h"
 #include "../fases/fases.h"
+#include "../modulos/modulos.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -96,26 +97,20 @@ void gerar_novo_modulo(GameState *g) {
     // Atribuir ID
     novo->id = g->proximo_id_modulo++;
     
-    // Sortear cor (0 = Vermelho, 1 = Verde, 2 = Azul)
-    int cor_aleatoria = rand() % 3;
-    novo->cor = (CorBotao)cor_aleatoria;
-    
     // Obter configuração da fase para tempo de execução
     const ConfigFase *config = obter_config_fase(g->dificuldade);
     novo->tempo_total = config->tempo_minimo_execucao + (rand() % (config->tempo_variacao_execucao + 1));
     novo->tempo_restante = novo->tempo_total;
     
-    // Definir instrução correta baseada na cor
-    switch (novo->cor) {
-        case COR_VERMELHO:
-            strcpy(novo->instrucao_correta, "p");
-            break;
-        case COR_VERDE:
-            strcpy(novo->instrucao_correta, "pp");
-            break;
-        case COR_AZUL:
-            strcpy(novo->instrucao_correta, "ppp");
-            break;
+    // Escolher tipo de módulo aleatoriamente
+    // 40% botão, 30% senha, 30% fios
+    int tipo_aleatorio = rand() % 10;
+    if (tipo_aleatorio < 4) {
+        gerar_modulo_botao(novo, g->dificuldade);
+    } else if (tipo_aleatorio < 7) {
+        gerar_modulo_senha(novo, g->dificuldade);
+    } else {
+        gerar_modulo_fios(novo, g->dificuldade);
     }
     
     // Limpar instrução digitada
@@ -350,8 +345,8 @@ void* thread_tedax(void* arg) {
             
             // Quando o tempo acabar, verificar se a instrução estava correta
             if (mod->tempo_restante <= 0) {
-            // Comparar instrução digitada com a correta
-            if (strcmp(mod->instrucao_digitada, mod->instrucao_correta) == 0) {
+            // Comparar instrução digitada com a correta usando validação específica do tipo
+            if (validar_instrucao_modulo(mod, mod->instrucao_digitada)) {
                 // Instrução correta: módulo resolvido
                 mod->estado = MOD_RESOLVIDO;
                 mod->tempo_desde_resolvido = 0; // Iniciar contador de tempo desde resolvido

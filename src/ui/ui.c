@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "ui.h"
 #include "../game/game.h"
+#include "../modulos/modulos.h"
 #include "../audio/audio.h"
 #include <ncurses.h>
 #include <string.h>
@@ -215,19 +216,19 @@ void desenhar_tela(const GameState *g, const char *buffer_instrucao) {
                 break;
         }
         
-        // Mostrar detalhes do módulo no formato M[Indice] [Categoria] [Cor]
-        const char* categoria = "Botao"; // Por enquanto só temos módulos de botão
-        const char* cor_nome = nome_cor(mod->cor);
+        // Mostrar detalhes do módulo usando função auxiliar
+        char info_modulo[128];
+        obter_info_exibicao_modulo(mod, info_modulo, sizeof(info_modulo));
         
         if (mod->estado == MOD_EM_EXECUCAO) {
-            mvprintw(linha, 0, "  M%d %s %s - %s", 
-                     mod->id, categoria, cor_nome, nome_estado_modulo(mod->estado));
+            mvprintw(linha, 0, "  M%d %s - %s", 
+                     mod->id, info_modulo, nome_estado_modulo(mod->estado));
         } else if (mod->estado == MOD_RESOLVIDO) {
-            mvprintw(linha, 0, "  M%d %s %s - %s", 
-                     mod->id, categoria, cor_nome, nome_estado_modulo(mod->estado));
+            mvprintw(linha, 0, "  M%d %s - %s", 
+                     mod->id, info_modulo, nome_estado_modulo(mod->estado));
         } else {
-            mvprintw(linha, 0, "  M%d %s %s - %s - Execucao: %d sec", 
-                     mod->id, categoria, cor_nome, nome_estado_modulo(mod->estado),
+            mvprintw(linha, 0, "  M%d %s - %s - Execucao: %d sec", 
+                     mod->id, info_modulo, nome_estado_modulo(mod->estado),
                      mod->tempo_total);
         }
         

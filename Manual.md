@@ -24,6 +24,79 @@ Cada módulo de botão possui uma cor e você deve apertar ele uma cenrta quanti
 
 ---
 
+### Módulo de Senha
+
+O módulo de senha exibe um hash (sequência de letras de A a I) e você deve descobrir a senha numérica correta usando as tabelas de mapeamento abaixo. O tamanho do hash varia conforme a dificuldade:
+- **Fácil**: 3 ou 4 caracteres
+- **Médio**: 4 ou 5 caracteres
+- **Difícil**: 5 ou 6 caracteres
+
+**Como resolver:**
+1. Observe o hash exibido (ex: "ABCE")
+2. Use a tabela de mapeamento correspondente à dificuldade do jogo
+3. Para cada letra do hash, encontre o número correspondente na tabela
+4. Digite a sequência numérica completa como instrução
+
+**Tabela de Mapeamento:**
+
+```
+Letras:          Números:
+A | B | C       9 | 5 | 2
+D | E | F       6 | 8 | 1
+G | H | I       7 | 3 | 4
+```
+
+**Exemplo:**
+- Hash: `ABCE`
+- Conversão usando a tabela: A→9, B→5, C→2, E→8
+- Senha: `9528`
+
+**Importante:**
+- O hash sempre usa apenas letras de A a I (9 caracteres distintos)
+- O mapeamento é sempre o mesmo, independente da dificuldade
+- A senha deve ser digitada como uma sequência numérica contínua (ex: `9528`)
+
+---
+
+### Módulo de Fios Coloridos
+
+O módulo de fios exibe uma sequência de fios coloridos no formato `/R/G/B/Y/W/` onde cada letra representa uma cor:
+- **R** = Vermelho (Red)
+- **G** = Verde (Green)
+- **B** = Azul (Blue)
+- **Y** = Amarelo (Yellow)
+- **W** = Branco (White)
+- **K** = Preto (Black)
+
+**Como resolver:**
+O módulo usa um dos 5 padrões de regras abaixo. Você deve identificar qual padrão está ativo e cortar o fio na posição correta.
+
+**Padrão 0 - Primeiro Fio Primário:**
+- Corte o primeiro fio que for de cor primária (R, G ou B)
+- Se não houver fio primário, corte o primeiro fio
+
+**Padrão 1 - Último Fio com Amarelo:**
+- Se houver um fio amarelo (Y) na sequência, corte o último fio
+- Caso contrário, corte o primeiro fio
+
+**Padrão 2 - Segundo Fio sem Preto:**
+- Se não houver fio preto (K) na sequência, corte o segundo fio
+- Caso contrário, corte o primeiro fio
+
+**Padrão 3 - Cor Mais Frequente:**
+- Identifique a cor que aparece mais vezes na sequência
+- Corte o primeiro fio dessa cor
+
+**Padrão 4 - Posição Central:**
+- Corte o fio na posição central (número de fios dividido por 2, arredondado para cima)
+- Exemplo: 5 fios → corte o fio na posição 3
+
+**Instrução:**
+- Digite o número da posição do fio a ser cortado (1, 2, 3, 4 ou 5)
+- Exemplo: Se precisar cortar o terceiro fio, digite `3`
+
+---
+
 # Como Enviar Instruções
 
 O jogo utiliza um sistema de comandos onde você especifica qual tedax, bancada e módulo deseja usar. Caso deseje enviar apenas a instrução, os componentes (tedax, bancada e módulo) serão considerados default. Você também pode expecificar apenas um componente.
